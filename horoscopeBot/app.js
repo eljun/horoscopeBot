@@ -20,15 +20,15 @@ app.set('view engine', 'jade');
 
 mongoose.connect('mongodb://localhost/test');
 
-var j = schedule.scheduleJob('42 * * * *', function(){
-  User.find({}, function(err, users) {
-    if(users != null ) {
-      users.forEach(function(user) {
-        _getHoroscope("aries");
-      });
-    }
-  });
-});
+// var j = schedule.scheduleJob('42 * * * *', function(){
+//   User.find({}, function(err, users) {
+//     if(users != null ) {
+//       users.forEach(function(user) {
+//         _getHoroscope("aries");
+//       });
+//     }
+//   });
+// });
 
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
