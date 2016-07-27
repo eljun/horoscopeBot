@@ -8,9 +8,9 @@ var routes       = require('./app/routes/index');
 var User         = require('./app/model/user');
 var users        = require('./app/routes/users');
 var webhooks     = require('./app/routes/webhooks');
+var apiController = require('./app/controller/api');
 var mongoose     = require('mongoose');
 var schedule     = require('node-schedule');
-
 
 var app = express();
 
@@ -20,15 +20,15 @@ app.set('view engine', 'jade');
 
 mongoose.connect('mongodb://localhost/test');
 
-// var j = schedule.scheduleJob('42 * * * *', function(){
-//   User.find({}, function(err, users) {
-//     if(users != null ) {
-//       users.forEach(function(user) {
-//         _getHoroscope("aries");
-//       });
-//     }
-//   });
-// });
+var j = schedule.scheduleJob('1 * * * * *', function(){
+  User.find({}, function(err, users ) {
+    if( users != null) {
+      users.forEach(function(user){
+         apiController.sendDailyHoroscope( user.fb_id, user.user_sign );
+      });
+    }
+  });
+});
 
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
@@ -39,7 +39,8 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'app/public')));
 
 app.use('/', routes);
-app.use('/users', users);
+// app.use('/users', users);
+app.use('/userlist', users);
 app.use('/webhook', webhooks);
 
 // catch 404 and forward to error handler

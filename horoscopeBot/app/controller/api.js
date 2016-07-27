@@ -79,95 +79,98 @@ function receivedMessage(event) {
         messageText = messageText.toLowerCase();
         switch (messageText) {
 
+            case "list":
+                showListOfSigns();
+                break;
+
             case "leo":
             case "leo":
             case "leoo":
-                _getHoroscope("leo");
+                subscribedUser( senderID, "leo");
                 break;
 
             case "ari":
             case "arie":
             case "aries":
             case "ariess":
-                _getHoroscope("aries");
+                subscribedUser( senderID, "aries");
                 break;
 
             case "taurus":
             case "tau":
             case "taur":
-                _getHoroscope("taurus");
+                subscribedUser( senderID, "taurus");
                 break;
 
             case "gemini":
             case "gem":
             case "gemi":
             case "gemini":
-                _getHoroscope("gemini");
+                subscribedUser( senderID, "gemini");
                 break;
 
             case "can":
             case "canc":
             case "cancer":
-                _getHoroscope("cancer");
+                subscribedUser( senderID, "cancer");
                 break;
 
             case "pisces":
             case "pis":
             case "pisc":
-                _getHoroscope("pisces");
+                subscribedUser( senderID, "pisces");
                 break;
 
             case "aquarius":
             case "aqu":
             case "aqua":
-                _getHoroscope("aquarius");
+                subscribedUser( senderID, "aquarius");
                 break;
 
             case "libra":
             case "lib":
             case "libr":
-                _getHoroscope("libra");
+                subscribedUser( senderID, "libra");
                 break;
 
             case "virgo":
             case "vir":
             case "virg":
-                _getHoroscope("virgo");
+                subscribedUser( senderID, "virgo");
                 break;
 
             case "scorpio":
             case "sco":
             case "scor":
-                _getHoroscope("scorpio");
+                subscribedUser( senderID, "scorpio");
                 break;
 
             case "sagittarius":
             case "sag":
             case "sagi":
-                _getHoroscope("sagittarius");
+                subscribedUser( senderID, "sagittarius");
                 break;
 
             case "capricorn":
             case "cap":
             case "capr":
-                _getHoroscope("capricorn");
+                subscribedUser( senderID, "capricorn");
                 break;
 
-            case "list":
-                showListOfSigns();
+            case "/unsubscribe":
+            case "unsubscribe":
+            case "stop subscription":
+                unsubscribe( senderID );
                 break;
 
-            case "send":
-                _defaultMessageSender(senderID, "Helo there");
+            case "settings":
+            case "stats":
+            case "status":
+                subscribeStatus( senderID );
                 break;
 
-            case "goodbye":
-            case "bye":
-                _defaultMessageSender(senderID, "Goodbye for now. Hope to see you tomorrow.");
-                break;
-
-            case "subscribe":
-                subcribedUser( senderID );
+            case "set":
+                _defaultMessageSender( senderID, "Please enter a new sign: ");
                 break;
 
             default:
@@ -179,24 +182,65 @@ function receivedMessage(event) {
 }
 
 // Subcribe our user
-function subcribedUser( userId ){
+function subscribedUser( userId, userSign ){
     // Create new User instance
     var newUser = new User({
       fb_id: userId,
+      user_sign: userSign
     });
 
     // If the user already exist then update it
     // If the user does not exist then add it
-    User.findOneAndUpdate( {fb_id: userId }, { fb_id: userId }, { upsert: true}, function(err, user){
+    User.findOneAndUpdate( {fb_id: userId, user_sign: userSign }, { fb_id: userId, user_sign: userSign }, { upsert: true}, function(err, user){
         if (err) {
-            _defaultMessageSender( userId, "There was an error subscribing you!");
+            _defaultMessageSender( userId, "There was an error subscribing you");
         } else {
-            console.log("User has been saved!");
-            _defaultMessageSender( userId, "User id " + newUser.fb_id + " has been susbcribed");
+            console.log("User has been saved!" + newUser.user_sign);
+            _defaultMessageSender( userId, "You have subscribed to " + newUser.user_sign );
         }
     });
 }
 
+// Unsubcribed user
+function unsubscribe( userId ){
+    User.findOneAndRemove({ fb_id: userId }, function( err, user){
+        // Remove users from dabase
+        if(err){
+            _defaultMessageSender( userId, "Error deleting the user " + user.fb_id );
+        } else {
+            _defaultMessageSender( userId, "Subscription has been successful.");
+        }
+    });
+}
+
+function subscribeStatus( userId ) {
+    User.findOne( { fb_id: userId }, function(err, user) {
+        var subscribeStatus = false;
+        if(err) {
+            _defaultMessageSender( userId, "Sorry error found!");
+        } else {
+            if ( user != null) {
+                subscribeStatus = true;
+                subscribeStatus = "You are currenthly subscribed to the sign: " + user.user_sign;
+                _defaultMessageSender( userId, subscribeStatus );
+            }
+            else {
+                _defaultMessageSender( userId, "You are currenty not subscribed to our daily horoscope" );
+            }
+        }
+    });
+}
+
+// Set user signs
+function setSign( userId, userSign ) {
+    User.findOneAndUpdate({ fb_id: currentSenderID }, { fb_id: currentSenderID, user_sign: userSign}, function(err, user) {
+        if(err) {
+            _defaultMessageSender( currentSenderID, "Sorry something went wrong!" );
+        } else {
+            _defaultMessageSender( user.fb_id, user.user_sign );
+        }
+    });
+}
 
 // Send out our daily horoscope
 function _sendHoroscope( horoscopeMessage ) {
@@ -234,11 +278,14 @@ function receivedPushback( event ) {
 
 }
 
-// Show Horoscope for today
-function _getHoroscope( sign ) {
+exports.welcome = function( recipientId, messageText ) {
+    _defaultMessageSender( recipientId, messageText );
+};
 
-    // First send intro message
-    _defaultMessageSender(currentSenderID, "Here is today's horoscope for " + sentenceCase( sign ), false);
+// Send our daily horoscope here
+exports.sendDailyHoroscope = function ( recipientId, sign ) {
+
+    _defaultMessageSender( recipientId, "Here is today's horoscope for " + sentenceCase( sign ), false);
     request({
         url: "http://hscpcdn.jaredco.com/" + sign + '-' + getTodaysDate() + '.txt',
         method: 'GET',
@@ -251,13 +298,23 @@ function _getHoroscope( sign ) {
             var currentHoroscope = JSON.parse( JSON.stringify(body) );
 
             // Send our daily horoscope here
-            _sendHoroscope( currentHoroscope );
+            // _sendHoroscope( currentHoroscope );
+            var messageText = chunkString( currentHoroscope, 250);
+
+            // If our horoscope text exceeds 250 char then it will be divided into chunks
+            // If chunk files are divided into more file
+            // If i is less than the array.length then continue looping
+            for( var i = 0; i < messageText.length; i ++ ) {
+                console.log( "Message body: ", messageText[i] );
+                _defaultMessageSender( recipientId, messageText[i] );
+            }
 
         } else {
             console.log("This is callback response: ", error);
         }
     });
-}
+};
+
 
 // Show list of signs
 function showListOfSigns() {
@@ -271,20 +328,6 @@ function showListOfSigns() {
                 "payload": {
                     "template_type": "generic",
                     "elements": [{
-                        "title": "Is your sign Aries?",
-                        "subtitle": "Just type the first three characters of the sing eg: ari for aries",
-                        "image_url": "http://hscpcdn.jaredco.com/zodiac-dates.png",
-                        "buttons": [{
-                            "type": "postback",
-                            "title": "Yes",
-                            "payload": "aries"
-                        }, {
-                            "type": "postback",
-                            "title": "No",
-                            "payload": "notaries"
-                        }],
-
-                    }, {
                         "title": "Please tell me your signs?",
                         "subtitle": "Just type the first three characters of the sing eg: ari for aries",
                         "image_url": "http://hscpcdn.jaredco.com/zodiac-dates.png"
@@ -348,7 +391,6 @@ function welcomeMessage( welcomeText ) {
     };
     callSendAPI(message);
 }
-
 
 // Limit the string
 function chunkString(str, len) {
