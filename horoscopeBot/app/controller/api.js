@@ -8,6 +8,8 @@ var router        = express.Router();
 
 // Global context var
 var currentSenderID;
+var waitingForDeliveryID = 0;
+var subscriptionStatus = "Unsubscribe";
 
 // Connect to our database
 
@@ -43,7 +45,7 @@ exports.handleEvents = function(req, res) {
                 } else if( messagingEvent.postback){
                     receivedPushback(messagingEvent);
                 } else {
-                    console.log("Webhook received unknown messagingEvent: ", messagingEvent);
+                    // console.log("Webhook received unknown messagingEvent: ", messagingEvent);
                 }
             });
         });
@@ -55,20 +57,19 @@ exports.handleEvents = function(req, res) {
     }
 };
 
-
 // Receiving the message
 function receivedMessage(event) {
 
-    var senderID = event.sender.id;
-    var recipientID = event.recipient.id;
-    var timeofMessage = event.timestamp;
-    var message = event.message;
-    currentSenderID = event.sender.id;
+    var senderID          = event.sender.id;
+    var recipientID       = event.recipient.id;
+    var timeofMessage     = event.timestamp;
+    var message           = event.message;
+    currentSenderID       = event.sender.id;
 
     console.log(JSON.stringify(message));
 
     // Filter what we really want
-    var messageText = event.message.text;
+    var messageText       = event.message.text;
     var messageAttachment = event.message.attachment;
 
     if (messageText == "Get Started") {
@@ -83,7 +84,6 @@ function receivedMessage(event) {
                 showListOfSigns();
                 break;
 
-            case "leo":
             case "leo":
             case "leoo":
                 subscribedUser( senderID, "leo");
@@ -181,6 +181,24 @@ function receivedMessage(event) {
     }
 }
 
+// // Send structure message with buttons
+function receivedPushback( event ) {
+
+    console.log(event);
+    var senderID = event.sender.id;
+    var recipientID = event.recipient.id;
+    var timeofMessage = event.timestamp;
+    var payload = event.postback.payload;
+    var data = payload.toLowerCase();
+
+    if(data == 'status') {
+        subscribeStatus( senderID );
+    } else if (data == 'unsubscribe') {
+        unsubscribe( senderID );
+    }
+
+}
+
 // Subcribe our user
 function subscribedUser( userId, userSign ){
     // Create new User instance
@@ -189,10 +207,12 @@ function subscribedUser( userId, userSign ){
       user_sign: userSign
     });
 
-    // If the user already exist then update it
-    // If the user does not exist then add it
-    User.findOneAndUpdate( {fb_id: userId, user_sign: userSign }, { fb_id: userId, user_sign: userSign }, { upsert: true}, function(err, user){
+    console.log("Before SenderID:" + userId + "Before Sign:" + userSign );
+
+    // Find user
+    User.findOneAndUpdate( {fb_id: userId }, { fb_id: userId, user_sign: userSign }, { upsert: true}, function(err, user){
         if (err) {
+            console.log( "Updating error: ", err );
             _defaultMessageSender( userId, "There was an error subscribing you");
         } else {
             console.log("User has been saved!" + newUser.user_sign);
@@ -208,7 +228,7 @@ function unsubscribe( userId ){
         if(err){
             _defaultMessageSender( userId, "Error deleting the user " + user.fb_id );
         } else {
-            _defaultMessageSender( userId, "Subscription has been successful.");
+            _defaultMessageSender( userId, "Unsubscribe has been successful.");
         }
     });
 }
@@ -259,24 +279,7 @@ function _sendHoroscope( horoscopeMessage ) {
     }
 }
 
-// Send structure message with buttons
-function receivedPushback( event ) {
-    var senderID = event.sender.id;
-    var recipientID = event.recipient.id;
-    var timeofMessage = event.timestamp;
 
-    var payload = event.postback.payload;
-
-    console.log("Received postback for user %d and page %d with payload '%s' " +
-    "at %d", senderID, recipientID, payload, timeofMessage);
-
-    if(payload.indexOf('aries') > -1 || payload === 'aries'){
-        _defaultMessageSender( senderID, "You have chosen " + payload.substr(0).toUpperCase() + " as your sign.");
-    }else {
-        _defaultMessageSender( senderID, "Error proccesing request"  + payload);
-    }
-
-}
 
 exports.welcome = function( recipientId, messageText ) {
     _defaultMessageSender( recipientId, messageText );
@@ -317,7 +320,10 @@ exports.sendDailyHoroscope = function ( recipientId, sign ) {
 
 
 // Show list of signs
-function showListOfSigns() {
+function showListOfSigns( ) {
+
+
+
     var message = {
         recipient: {
             id: currentSenderID,
@@ -330,7 +336,19 @@ function showListOfSigns() {
                     "elements": [{
                         "title": "Please tell me your signs?",
                         "subtitle": "Just type the first three characters of the sing eg: ari for aries",
-                        "image_url": "http://hscpcdn.jaredco.com/zodiac-dates.png"
+                        "image_url": "http://hscpcdn.jaredco.com/zodiac-dates.png",
+                        "buttons": [
+                            {
+                                "type": "postback",
+                                "title": "Status",
+                                "payload": "status"
+                            },
+                             {
+                                "type": "postback",
+                                "title": "Unsubscribe",
+                                "payload": "unsubscribe"
+                            }
+                        ]
                     }]
                 }
             }
@@ -338,6 +356,20 @@ function showListOfSigns() {
     };
     callSendAPI(message);
 }
+
+
+function currentStats() {
+    User.findOne( { fb_id: senderId }, function(err, user) {
+        if(user != null) {
+            subscriptionStatus = "Stop subscription";
+            console.log("User exist!", subscriptionStatus);
+        } else {
+            subscriptionStatus = "Please subscribe"
+            console.log("Can't find the user", subscriptionStatus);
+        }
+    });
+}
+
 
 // Sentence Case
 function sentenceCase(str) {
