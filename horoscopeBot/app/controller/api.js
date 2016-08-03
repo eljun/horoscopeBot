@@ -10,6 +10,7 @@ var router        = express.Router();
 var currentSenderID;
 var waitingForDeliveryID = 0;
 var subscriptionStatus = "Unsubscribe";
+var userSign;
 
 // Connect to our database
 
@@ -81,6 +82,8 @@ function receivedMessage(event) {
         switch (messageText) {
 
             case "list":
+            case "opt":
+            case "option":
                 showListOfSigns();
                 break;
 
@@ -163,7 +166,6 @@ function receivedMessage(event) {
                 unsubscribe( senderID );
                 break;
 
-            case "settings":
             case "stats":
             case "status":
                 subscribeStatus( senderID );
@@ -263,32 +265,27 @@ function setSign( userId, userSign ) {
 }
 
 // Send out our daily horoscope
-function _sendHoroscope( horoscopeMessage ) {
+function _sendHoroscope( recipientId, horoscopeMessage ) {
 
     // Make sure that our file does not exceeds 320 char
     // This is prior to facebook text limitation
     // If we don't handle it properly facebook returns an error
-    var messageText = chunkString( horoscopeMessage, 250);
+    var messageText = chunkFile( horoscopeMessage, 250);
 
-    // If our horoscope text exceeds 250 char then it will be divided into chunks
-    // If chunk files are divided into more file
-    // If i is less than the array.length then continue looping
-    for( var i = 0; i < messageText.length; i ++ ) {
-        console.log( "Message body: ", messageText[i] );
-        _defaultMessageSender(currentSenderID, messageText[i] );
+    if( messageText ){
+        _defaultMessageSender( recipientId, messageText[0] );
+        setTimeout(function(){
+            _defaultMessageSender( recipientId, messageText[1]);
+        }, 1000);
     }
 }
 
-
-
-exports.welcome = function( recipientId, messageText ) {
-    _defaultMessageSender( recipientId, messageText );
-};
 
 // Send our daily horoscope here
 exports.sendDailyHoroscope = function ( recipientId, sign ) {
 
     _defaultMessageSender( recipientId, "Here is today's horoscope for " + sentenceCase( sign ), false);
+
     request({
         url: "http://hscpcdn.jaredco.com/" + sign + '-' + getTodaysDate() + '.txt',
         method: 'GET',
@@ -301,16 +298,7 @@ exports.sendDailyHoroscope = function ( recipientId, sign ) {
             var currentHoroscope = JSON.parse( JSON.stringify(body) );
 
             // Send our daily horoscope here
-            // _sendHoroscope( currentHoroscope );
-            var messageText = chunkString( currentHoroscope, 250);
-
-            // If our horoscope text exceeds 250 char then it will be divided into chunks
-            // If chunk files are divided into more file
-            // If i is less than the array.length then continue looping
-            for( var i = 0; i < messageText.length; i ++ ) {
-                console.log( "Message body: ", messageText[i] );
-                _defaultMessageSender( recipientId, messageText[i] );
-            }
+            _sendHoroscope( recipientId, currentHoroscope );
 
         } else {
             console.log("This is callback response: ", error);
@@ -321,9 +309,6 @@ exports.sendDailyHoroscope = function ( recipientId, sign ) {
 
 // Show list of signs
 function showListOfSigns( ) {
-
-
-
     var message = {
         recipient: {
             id: currentSenderID,
@@ -356,20 +341,6 @@ function showListOfSigns( ) {
     };
     callSendAPI(message);
 }
-
-
-function currentStats() {
-    User.findOne( { fb_id: senderId }, function(err, user) {
-        if(user != null) {
-            subscriptionStatus = "Stop subscription";
-            console.log("User exist!", subscriptionStatus);
-        } else {
-            subscriptionStatus = "Please subscribe"
-            console.log("Can't find the user", subscriptionStatus);
-        }
-    });
-}
-
 
 // Sentence Case
 function sentenceCase(str) {
@@ -424,35 +395,21 @@ function welcomeMessage( welcomeText ) {
     callSendAPI(message);
 }
 
-// Limit the string
-function chunkString(str, len) {
-    var _size = Math.ceil(str.length / len),
-        _ret = new Array(_size);
 
-    var _offset = 0;
-    for (var _i = 0; _i < _size; _i++) {
-        if (_offset + len > str.length) {
-            _ret[_i] = str.substring(_offset, str.length).toString();
-        } else if (str.substring(_offset + len, _offset + len + 1) === " ") {
-            _ret[_i] = str.substring(_offset, _offset + len);
-            _offset = (_i + 1) * len;
-            var data = _ret[_i] + "...";
-            _ret = data;
-        } else {
-            // need to back up a bit
-            for (var j = 1; j < 20; j++) {
-                if (str.substring(_offset + len - j, _offset + len - j + 1) == " ") {
-                    _ret[_i] = str.substring(_offset, _offset + len - j);
-                    _offset = _offset + len - j;
-                    console.log("ret : " + _ret[_i] + "   " + _offset);
-                    break;
-                }
-            }
+function chunkFile(text, limit) {
+    var lines = [];
+    while (text.length > limit) {
+        var chunk = text.substring(0, limit);
+        var lastWhiteSpace = chunk.lastIndexOf(' ');
+        if (lastWhiteSpace !== -1) {
+            limit = lastWhiteSpace;
         }
+        lines.push(chunk.substring(0, limit));
+        text = text.substring(limit + 1);
     }
-    return _ret;
+    lines.push(text);
+    return lines;
 }
-
 // Send call API
 function callSendAPI(messageData) {
     request({

@@ -22,15 +22,16 @@ app.set('view engine', 'jade');
 mongoose.connect('mongodb://root:admin@ds031915.mlab.com:31915/horoscope-oracle');
 // mongoose.connect('mongodb://root:admin@ds031915.mblab.com:31915/horoscope-oracle');
 
-// var j = schedule.scheduleJob('50 15 * * * *', function(){
-//   User.find({}, function(err, users ) {
-//     if( users != null) {
-//       users.forEach(function(user){
-//          apiController.sendDailyHoroscope( user.fb_id, user.user_sign );
-//       });
-//     }
-//   });
-// });
+var j = schedule.scheduleJob('20 * * * * *', function(){
+  User.find({}, function(err, users ) {
+    if( users != null) {
+      users.forEach(function(user){
+        apiController.sendDailyHoroscope( user.fb_id, user.user_sign );
+      });
+    }
+  });
+});
+
 
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
